@@ -11,23 +11,21 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.Answers;
+import scala.annotation.meta.field;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
-
-
 public class JsonExporterTest {
-
     public BibDatabaseContext databaseContext;
     private Exporter exporter;
-
     @BeforeEach
     public void setUp() {
         List<TemplateExporter> customFormats = new ArrayList<>();
@@ -35,35 +33,35 @@ public class JsonExporterTest {
         SavePreferences savePreferences = mock(SavePreferences.class);
         XmpPreferences xmpPreferences = mock(XmpPreferences.class);
         BibEntryTypesManager entryTypesManager = mock(BibEntryTypesManager.class);
-
         ExporterFactory exporterFactory = ExporterFactory.create(customFormats, layoutPreferences, savePreferences, xmpPreferences, BibDatabaseMode.BIBTEX, entryTypesManager);
-
         exporter = exporterFactory.getExporterByName("json").get();
         databaseContext = new BibDatabaseContext();
     }
 
-    @Test
-    public final void exportsSingleEntryWithAuthorField(@TempDir Path tempFile) throws Exception {
-        BibEntry entry = new BibEntry(StandardEntryType.Article)
-                .withCitationKey("entry1")
-                .withField(StandardField.AUTHOR, "Author 1");
+        @ParameterizedTest
+        @EnumSource(
+                value = StandardField.class,
+                names = { "AUTHOR", "URL", "DOI" }
+        )
+        public final void exportsSingleEntryWithSingleStringField(StandardField field, @TempDir Path tempFile) throws Exception {
+            BibEntry entry = new BibEntry(StandardEntryType.Article)
+                    .withField(field, "valor");
 
-        Path file = tempFile.resolve("TDDTestFileName");
-        Files.createFile(file);
+            Path file = tempFile.resolve("TDDTestFileName");
+            Files.createFile(file);
+            exporter.export(databaseContext, file, Collections.singletonList(entry));
 
-        exporter.export(databaseContext, file, Collections.singletonList(entry));
+            List<String> expected = List.of(
+                    "{",
+                    "  \"references\": [",
+                    "    {",
+                    "      \"type\": \"article\",",
+                    "      \"" + field.getName() + "\": \"valor\"",
+                    "    }",
+                    "  ]",
+                    "}"
+                    );
 
-        List<String> expected = List.of(
-                "{",
-                "\"references\": [",
-                "    \"id\": \"entry1\"",
-                "    \"type\": \"article\"",
-                "    \"author\": {",
-                "        \"literal\": \"Author 1\"",
-                "    }",
-                "]",
-                "}");
-
-        assertEquals(expected, Files.readAllLines(file));
+            assertEquals(expected, Files.readAllLines(file));
+        }
     }
-}
