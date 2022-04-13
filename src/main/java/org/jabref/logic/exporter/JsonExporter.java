@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 /**
  * A custom exporter to write bib entries to a .json file for further processing
@@ -33,7 +34,7 @@ public class JsonExporter extends Exporter {
     }
     private JsonArray parseEntriesToJson(List<BibEntry> entries){
         JsonArray entriesJson = new JsonArray();
-        entries.forEach(e -> entriesJson.add(parseEntryTojson(e)));
+        entriesJson.add(parseEntryTojson(entries.stream().findFirst().get()));
         return entriesJson;
     }
     private JsonObject parseEntryTojson(BibEntry entry){
@@ -51,8 +52,22 @@ public class JsonExporter extends Exporter {
                         }
                     })
                 );
+        entry.getFields().forEach(f -> addFieldInJson(entryJson, f, entry.getField(f)));
         return entryJson;
     }
+
+    private void addFieldInJson(JsonObject object, Field field, Optional<String> value){
+        if (value.isEmpty()) {
+            return;
+        }
+
+        if (field.isNumeric()) {
+            object.addProperty(field.getName(), Integer.parseInt(value.get()));
+            return;
+        }
+        object.addProperty(field.getName(), value.get());
+    }
+
     private void writeToFile(String content, Path file) throws Exception{
         try (BufferedWriter writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
             writer.write(content);
